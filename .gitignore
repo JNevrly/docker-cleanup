@@ -9,3 +9,4 @@ __pycache__/
 .cache/
 *.tsbuildinfo
 release-assets/
+.venv-release/

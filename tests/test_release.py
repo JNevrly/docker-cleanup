@@ -7,13 +7,36 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import release
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_prefers_standard_library_parser(self):
+        parser = Mock()
+        with patch.object(release.importlib, "import_module", return_value=parser) as load:
+            self.assertIs(release.toml_parser(), parser)
+            load.assert_called_once_with("tomllib")
+
+    def test_falls_back_to_tomli(self):
+        parser = Mock()
+        with patch.object(release.importlib, "import_module",
+                          side_effect=[ModuleNotFoundError("tomllib"), parser]) as load:
+            self.assertIs(release.toml_parser(), parser)
+            self.assertEqual([call.args[0] for call in load.call_args_list], ["tomllib", "tomli"])
+
+    def test_missing_parser_has_clean_cli_setup_guidance(self):
+        with patch.object(release.importlib, "import_module", side_effect=ModuleNotFoundError):
+            with patch.object(sys, "argv", ["release.py", "check", "--tag", "v1.2.3"]):
+                with self.assertRaises(SystemExit) as error:
+                    release.main()
+        message = str(error.exception)
+        self.assertIn("Release validation failed:", message)
+        self.assertIn(".venv-release/bin/python -m pip install -r scripts/requirements-release.txt", message)
+        self.assertNotIn("Traceback", message)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

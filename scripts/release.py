@@ -2,24 +2,42 @@
 """Validate release identity and stage portable GitHub release assets. No publishing."""
 import argparse
 import hashlib
+import importlib
 import json
 import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
-import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "https://github.com/JNevrly/docker-cleanup"
 
 
+def toml_parser():
+    """Keep --help/import usable when an older Python has no TOML parser."""
+    try:
+        return importlib.import_module("tomllib")
+    except ModuleNotFoundError:
+        try:
+            return importlib.import_module("tomli")
+        except ModuleNotFoundError:
+            raise ValueError(
+                "TOML parsing requires Python 3.11+ or the tomli backport "
+                "(Python 3.8+). For an isolated setup run:\n"
+                "  python3 -m venv .venv-release\n"
+                "  .venv-release/bin/python -m pip install -r scripts/requirements-release.txt\n"
+                "Then rerun this command with .venv-release/bin/python."
+            ) from None
+
+
 def check(root=ROOT, tag=None):
+    toml = toml_parser()
     package = json.loads((root / "package.json").read_text())
     lock = json.loads((root / "package-lock.json").read_text())
     tauri = json.loads((root / "src-tauri/tauri.conf.json").read_text())
-    cargo = tomllib.loads((root / "src-tauri/Cargo.toml").read_text())["package"]
-    cargo_lock = tomllib.loads((root / "src-tauri/Cargo.lock").read_text())
+    cargo = toml.loads((root / "src-tauri/Cargo.toml").read_text())["package"]
+    cargo_lock = toml.loads((root / "src-tauri/Cargo.lock").read_text())
     version = package["version"]
     if not re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", version):
         raise ValueError("Release version must be stable X.Y.Z")

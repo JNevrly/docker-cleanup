@@ -14,8 +14,10 @@ Repository: <https://github.com/JNevrly/docker-cleanup>. License: [MIT](../LICEN
    real CLI SSH/mutual-TLS fixtures, two complete locked normalized package builds
    compared byte-for-byte, MIT license inclusion and a smoke journey using the
    executable extracted from the final package.
-3. **Draft release:** only a pushed `vX.Y.Z` tag in `JNevrly/docker-cleanup`, after
-   both previous jobs pass. Downloads that run's verified assets and creates a
+3. **Python 3.10 compatibility:** release-helper checks in an isolated environment
+   with the pinned `tomli` backport; the normal Python 3.11+ job uses stdlib only.
+4. **Draft release:** only a pushed `vX.Y.Z` tag in `JNevrly/docker-cleanup`, after
+   all previous jobs pass. Downloads that run's verified assets and creates a
    **draft**, never a published release or an overwrite of an existing release.
 
 Only the draft-release job has `contents: write`; other jobs have read-only
@@ -55,6 +57,21 @@ Preparation alone does **not** push or publish anything. Before pushing:
 - Push the reviewed commit to the intended default branch and require green CI.
 
 Then, **when ready to create the draft**:
+
+The release helper supports Python 3.8+. Python 3.11+ includes `tomllib`; on
+Python 3.8–3.10 install the pinned `tomli` backport in an isolated environment:
+
+```bash
+python3 -m venv .venv-release
+.venv-release/bin/python -m pip install -r scripts/requirements-release.txt
+.venv-release/bin/python scripts/release.py check --tag v0.4.0
+```
+
+If creating the environment fails on Ubuntu/Debian, install the matching
+`python3-venv` package first. Alternatively, run the helper directly with an
+installed Python 3.11+ interpreter. The following commands assume that
+`python3` has either parser available (activate the environment with
+`source .venv-release/bin/activate` if using the backport):
 
 ```bash
 python3 scripts/release.py check --tag v0.4.0
@@ -124,7 +141,7 @@ Local verification passed:
 
 | Check | Result |
 |---|---|
-| Version/tag/license guards, portable checksums and stale-asset refusal | 15 Python tests, including seven release-helper cases |
+| Version/tag/license guards, portable checksums and stale-asset refusal | 18 Python tests, including ten release-helper cases |
 | Frontend unit / production build / formatting | 14 tests; build and Prettier pass |
 | Browser journeys | 57 passed with two workers |
 | Rust core / formatting / desktop Clippy | 14 unit + 22 service tests; warnings-denied Clippy and Rustfmt pass |
@@ -138,6 +155,11 @@ diagnostics in `artifacts/release-prep-evidence/` (both intentionally ignored).
 Its manifest has empty commit/run fields because no hosted workflow produced it.
 The real GitHub workflow will supply those fields and its own checksum.
 The supplied screenshot was used unchanged.
+
+The Python compatibility follow-up passed all 18 Python tests on both Python
+3.11.2 (stdlib `tomllib`) and real Python 3.10.22 (`tomli` 2.5.0 in a virtualenv).
+Without the backport, Python 3.10 now exits with setup guidance rather than an
+import traceback; `--help` still works.
 
 **Not yet verified:** GitHub runner setup, repository permissions, tag-triggered
 draft creation and actual release upload. These need the first hosted run.

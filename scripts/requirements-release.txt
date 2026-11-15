@@ -1,0 +1,2 @@
+# Python 3.11+ has tomllib in the standard library.
+tomli==2.5.0; python_version < "3.11"
