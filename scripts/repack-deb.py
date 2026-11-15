@@ -27,6 +27,9 @@ def main():
         root = temporary / "root"
         output = temporary / "normalized.deb"
         subprocess.run(["dpkg-deb", "--raw-extract", str(package), str(root)], check=True)
+        copyright_file = root / "usr/share/doc/docker-cleanup/copyright"
+        if copyright_file.is_file():
+            copyright_file.chmod(0o644)
         subprocess.run(["dpkg-deb", "--root-owner-group", "-Zgzip", "-z9",
                         "--build", str(root), str(output)], check=True)
         shutil.copyfile(output, package)

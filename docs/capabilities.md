@@ -2,7 +2,8 @@
 
 ## Compatibility and validation
 
-The application accepts **local Linux Unix sockets only**, negotiates the
+The Linux application accepts **local Unix sockets** and explicit existing
+**SSH/verified mutual-TLS Docker contexts**, negotiates the
 daemon's maximum API capped at 1.56, and requires a mutually supported API
 between 1.44 and 1.56. Rootful and rootless socket paths are configurable.
 API compatibility does not imply every storage backend is verified.
@@ -12,6 +13,10 @@ containerd/overlayfs storage, accessed through an identity-checked disposable
 DinD socket. `/version`, `/info`, `/system/df`, container list and volume list
 were read successfully. Other versions, legacy overlay2, rootless installations,
 and external buildx drivers require separate validation.
+
+Remote transport delegates authentication to the Docker CLI; direct Unix sockets
+remain CLI-independent. See [reviewed remote design](remote-context-design.md)
+and [user guide](user-guide.md#remote-ssh-and-tls-contexts).
 
 | Capability | Source | Semantics / limitations |
 |---|---|---|
@@ -27,10 +32,16 @@ and external buildx drivers require separate validation.
 | Changed filesystem paths | Container changes API | Added/changed/deleted paths only, not per-directory sizes; never starts a container |
 | Container processes | Container top with PID/comm only | Running containers only; command arguments and environment omitted |
 | Host processes | On-demand `/proc` cwd and local TCP sockets | Best effort; no escalation. Disabled in harness namespace. Namespace/permission limits reported |
+| Remote SSH/TLS contexts | Explicit `context://NAME`, Docker CLI bridge | SSH trust/agent or verified CA+client certificate/key; no plaintext or insecure TLS fallback. Local host-process correlation disabled; paths are metadata only. |
 | Event history | Bounded `/events` since previous snapshot | On refresh; start/attach/mount evidence where available. Not an always-running monitor |
 | Host free-space change | Not measured in MVP | Cannot reliably map daemon root into application mount namespace; explicitly unavailable |
 
 ## Missing, zero and errors
+
+[Per-directory analysis decision](storage-analysis-decision.md): portable
+writable-layer directory sizing is not available from these APIs. A merged
+rootfs export would be a separate opt-in, content-transferring diagnostic,
+not writable-byte attribution; no scanner is enabled.
 
 `bytes: 0` means measured zero. `bytes: null` / `shared: null` means not known;
 unknown measurements are excluded from measured treemap area but remain in the

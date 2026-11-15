@@ -1,7 +1,18 @@
 {
   "name": "docker-cleanup",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.4.0",
+  "description": "An evidence-led, safety-first Docker storage explorer for Linux",
+  "license": "MIT",
+  "author": "Josef (JNevrly)",
+  "homepage": "https://github.com/JNevrly/docker-cleanup",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JNevrly/docker-cleanup.git"
+  },
+  "bugs": {
+    "url": "https://github.com/JNevrly/docker-cleanup/issues"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",

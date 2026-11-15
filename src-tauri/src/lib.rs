@@ -1,4 +1,5 @@
 pub mod cleanup;
+pub mod contexts;
 pub mod docker;
 pub mod inventory;
 pub mod model;
@@ -42,7 +43,7 @@ impl Service {
     fn engine(&self) -> Result<&Docker> {
         self.docker
             .as_ref()
-            .ok_or("Connect to a local Docker endpoint first".into())
+            .ok_or("Connect to a Docker endpoint first".into())
     }
     fn asset(&self, key: &str) -> Result<Asset> {
         self.snapshot
@@ -56,8 +57,14 @@ impl Service {
         // Reconnect for daemon identity checks; an endpoint may now refer to a
         // replacement daemon even though its socket path has not changed.
         let current = Docker::connect(&docker.endpoint)?;
-        if current.identity != docker.identity {
-            return Err("Daemon identity changed; reconnect and review a new inventory".into());
+        if current.identity != docker.identity
+            || current.connection_key() != docker.connection_key()
+        {
+            self.plans.clear();
+            return Err(
+                "Daemon identity or context target changed; reconnect and review a new inventory"
+                    .into(),
+            );
         }
         let snapshot = inventory::scan(&current, &self.store, || {
             self.cancelled.load(Ordering::Relaxed)
@@ -77,10 +84,21 @@ impl Service {
         progress: impl Fn(Value),
     ) -> Result<Value> {
         match request {
+            Request::Contexts => Ok(json!(contexts::list()?)),
             Request::Scan { endpoint } => {
-                progress(json!({"phase":"connecting","message":"Checking local Docker endpoint"}));
+                // Invalidate plans even if a switch/authentication attempt fails.
+                self.plans.clear();
+                if self.docker.as_ref().is_some_and(|d| d.endpoint != endpoint) {
+                    self.snapshot = None;
+                    self.docker = None;
+                }
+                progress(
+                    json!({"phase":"connecting","message":"Checking selected Docker endpoint"}),
+                );
                 let docker = Docker::connect(&endpoint)?;
-                if self.docker.as_ref().map(|d| &d.identity) != Some(&docker.identity) {
+                if self.docker.as_ref().is_none_or(|d| {
+                    d.identity != docker.identity || d.connection_key() != docker.connection_key()
+                }) {
                     self.plans.clear();
                     self.snapshot = None;
                 }
@@ -106,7 +124,7 @@ impl Service {
             } => {
                 self.asset(&key)?;
                 self.store.save_asset(
-                    &self.engine()?.identity,
+                    &self.engine()?.state_scope(),
                     &key,
                     &alias,
                     project.as_deref(),
@@ -163,6 +181,13 @@ impl Service {
             .get(id)
             .cloned()
             .ok_or("Plan expired or already consumed; review a new plan")?;
+        if self.engine()?.identity != before.daemon_id
+            || self.engine()?.endpoint != before.endpoint
+            || before.capabilities.get("connection") != Some(&self.engine()?.connection_key())
+        {
+            self.plans.remove(id);
+            return Err("Cleanup connection changed; review a new plan".into());
+        }
         if !confirmed || (plan.volumes && !volumes) || (plan.cache_scope && !cache) {
             return Err(
                 "Explicit deletion and applicable volume/builder-scope confirmations are required"

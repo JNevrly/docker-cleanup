@@ -43,7 +43,9 @@ related links, tri-state selection/cache discovery and typed live progress.
 See [the usability validation report](usability-validation.md) for evidence.
 The [treemap reliability report](treemap-validation.md) records the exact reported
 reference, real whitespace-pointer targets, tiny-group fallback and native W3C
-pointer coverage. Full suite: 56 browser journeys; native source run: 24 checks.
+pointer coverage. That treemap baseline has 56 browser journeys; its native source
+run has 24 checks. The remote-context release adds a browser journey (57 total)
+and 22 real CLI transport checks.
 
 ## Live disposable Docker journey
 
@@ -108,6 +110,37 @@ The test disables WebKit sandboxing **only inside the disposable root-run
 builder**. This is not an application deployment setting. Audio, portal, or FUSE
 warnings can occur under Xvfb without affecting this test's features.
 
+## Remote context transport verification
+
+`tests/remote_contexts.py` provisions isolated loopback SSH and mutual-TLS
+servers against a synthetic Engine API. It uses the real Docker CLI and Rust
+service, temporary context/credential directories and an isolated sshd; it
+never uses an external host, user's contexts or a default daemon.
+
+In the disposable Debian builder, install Docker CLI (validated versions 29.9.3
+and Debian's 20.10.24),
+OpenSSH server/client and OpenSSL, then:
+
+```bash
+python3 scripts/dind.py sync
+python3 scripts/dind.py exec \
+  'cargo build --locked --manifest-path src-tauri/Cargo.toml --bin cleanup-rpc && python3 tests/remote_contexts.py'
+python3 scripts/dind.py download /workspace/artifacts/remote-context-report.json artifacts/remote-contexts
+```
+
+The test runs as root **inside that disposable builder only** to launch its
+isolated sshd. Credentials are generated for the test and discarded. SSH host
+checking and TLS verification remain enabled. There is no real remote user's
+data or Engine-global prune. Assertions include insecure transport refusal,
+poisoned default environment, remote path/process isolation, endpoint-scoped
+preferences, context retargeting, failed-switch plan invalidation, explicit
+confirmation, reviewed-only mutation, replay refusal and credential redaction.
+
+UI fixture tests exercise explicit discovery, remote review identity and
+same-daemon/failed-switch selection clearing. These do not themselves prove SSH/
+TLS transport; the CLI/Rust journey does. No external host, arbitrary CLI version,
+hardware-key agent, proxy or actual remote/rootless Engine is claimed verified.
+
 ## Linux package
 
 On a Linux machine with the documented native build dependencies:
@@ -162,6 +195,12 @@ DOCKER_CLEANUP_UPGRADE_VERSION=0.3.0 \
 
 The [packaged upgrade report](../artifacts/m3/packaged/native-report.json) records
 29 checks; [0.3.1 release notes](treemap-release.md) include checksum and screenshots.
+
+For the current update, extract the actual prior 0.3.1 and new 0.4.0 packages,
+then use `DOCKER_CLEANUP_UPGRADE_VERSION=0.3.1` and the corresponding extracted
+binary paths. The [0.4.0 packaged report](../artifacts/remote-contexts/packaged/native-report.json)
+records the same 29-check persistence/safety journey. Native Unix API coverage
+and the separate real-CLI SSH/TLS transport coverage remain distinct.
 
 To reproduce the package comparison, run the complete build script
 twice and compare copies with `cmp`; identical hashes are only claimed for the

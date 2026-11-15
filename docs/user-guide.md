@@ -9,13 +9,60 @@ and choose **Connect & scan**:
 - Rootless Docker: often `unix:///run/user/1000/docker.sock` (use your UID)
 - Development DinD: `unix:///other_mounts/test-docker/docker.sock`, inside the harness
 
-The connected daemon ID and negotiated API appear next to the scan time. Only
-Unix endpoints are accepted. A failed connection never triggers permission
-changes or elevation. Check the socket's owner/group and your Docker setup;
+The connected daemon ID and negotiated API appear next to the scan time.
+Direct Unix endpoints and explicit SSH/verified-TLS Docker contexts are accepted.
+A failed connection never triggers permission changes or elevation.
+Check the socket's owner/group and your Docker setup;
 do not make it world-writable. Docker socket access itself is highly privileged.
 
 The browser-only developer preview is clearly marked **SYNTHETIC DATA**. It does
 not connect to Docker, and its cleanup button says **Simulate cleanup**.
+
+### Remote SSH and TLS contexts
+
+Local sockets need no Docker CLI. Remote connections require the Docker CLI
+(validated with 29.9.3 and Debian's 20.10.24), and SSH contexts also require OpenSSH.
+Create and verify the context outside the app, as your normal desktop user:
+
+```bash
+docker context create my-server --docker 'host=ssh://user@server'
+docker --context my-server info
+```
+
+Establish SSH host trust and working agent/key authentication in a terminal first.
+The application does not accept passwords, install keys, weaken host checking
+or fix remote permissions. Your SSH configuration is trusted; do not configure
+insecure host-key bypasses. Custom SSH socket URL paths are not supported here.
+
+For a TLS Engine, use your operator-provided CA/client credentials:
+
+```bash
+docker context create my-tls --docker \
+  'host=tcp://server:2376,ca=/private/ca.pem,cert=/private/cert.pem,key=/private/key.pem'
+docker --context my-tls info
+```
+
+Choose **Contexts**, then a supported SSH/TLS context, or enter `context://NAME`
+directly in the connection field. Submit **Connect & scan** (or **Refresh** when
+switching). **Contexts** toggles the chooser; it closes after choosing a target
+to preserve workspace space. The app never automatically follows the CLI's active context or
+`DOCKER_HOST`. Discovery lists at most 32 contexts; enter a name directly if it
+is not listed. Plain TCP, skipped TLS verification, URL passwords and contexts
+without mutual-TLS material are refused without fallback.
+
+The connection and cleanup review show **REMOTE**, the context, resolved host
+and daemon identity. Check all of them before confirming deletion. A connection
+switch clears selection/inspection and invalidates old plans, even if it reaches
+the same daemon or the new connection fails. Remote aliases/protections/project
+overrides are scoped to context, target and daemon; local preferences retain
+their existing daemon scope. Remote mount/project paths are reported metadata,
+not local filesystem evidence; local host process correlation is disabled.
+Container processes still come from the selected Engine.
+
+Authentication errors are intentionally redacted. Diagnose with the same context
+in a terminal; the app never prints CLI stderr or copies keys into its history.
+CLI requests time out after 60 seconds and close their subprocess group.
+Many remote API calls, especially large scans, can be slower than local scans.
 
 ## Investigate the biggest assets
 

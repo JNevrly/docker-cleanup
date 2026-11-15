@@ -40,6 +40,7 @@ import {
 import type { CleanupProgress } from "./types";
 import Splitter from "./Splitter";
 import MapGroupBrowser from "./MapGroupBrowser";
+import { connectionIdentity } from "./connections";
 import { useElementSize, useMapSpace } from "./useElementSize";
 import {
   HistoryPage,
@@ -74,6 +75,9 @@ export default function App() {
   );
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [endpoint, setEndpoint] = useState("unix:///var/run/docker.sock");
+  const [contexts, setContexts] = useState<
+    { name: string; endpoint: string; target: string }[] | null
+  >(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
@@ -214,15 +218,23 @@ export default function App() {
   }
   function acceptSnapshot(next: Snapshot, expectedRemoval = false) {
     setSnapshot(next);
-    if (snapshot && next.daemonId !== snapshot.daemonId) {
+    if (
+      snapshot &&
+      (next.daemonId !== snapshot.daemonId ||
+        connectionIdentity(next) !== connectionIdentity(snapshot))
+    ) {
       setPlan(null);
       setSelected(new Set());
       setFocused(null);
       setInspectionHistory([]);
       setInspectionTabs({});
       setInspectionData({});
+      requestAnimationFrame(() => {
+        const table = document.querySelector(".table-scroll");
+        if (table) table.scrollTop = 0;
+      });
       setSelectionNotice(
-        "Docker daemon changed. Selection and inspector were cleared to prevent cross-endpoint cleanup.",
+        `${next.daemonId !== snapshot.daemonId ? "Docker daemon" : "Docker connection"} changed. Selection and inspector were cleared to prevent cross-endpoint cleanup.`,
       );
       return;
     }
@@ -238,6 +250,19 @@ export default function App() {
     );
   }
   function scan() {
+    if (active.current) return;
+    if (snapshot && snapshot.endpoint !== endpoint) {
+      setSnapshot(null);
+      setPlan(null);
+      setSelected(new Set());
+      setFocused(null);
+      setInspectionHistory([]);
+      setInspectionTabs({});
+      setInspectionData({});
+      setSelectionNotice(
+        "Docker connection changed. Selection and inspector were cleared; connect and review again.",
+      );
+    }
     void run<Snapshot>({ type: "scan", endpoint }, acceptSnapshot);
   }
   useEffect(() => {
@@ -449,7 +474,7 @@ export default function App() {
   }
   function inspectData(type: InspectionKind, a: Asset) {
     setInspectionTabs((previous) => ({ ...previous, [a.key]: type }));
-    const key = `${snapshot?.daemonId}:${a.key}:${type}`;
+    const key = `${snapshot ? connectionIdentity(snapshot) : ""}:${a.key}:${type}`;
     void run<unknown>(
       { type, key: a.key },
       (data) =>
@@ -543,13 +568,13 @@ export default function App() {
               <option value="system">System</option>
             </select>
           </label>
-          <span className="dot green" /> Local Docker only
+          <span className="dot green" /> Unix · SSH · TLS
           <p>
             Inspect first.
             <br />
             Clean with confidence.
           </p>
-          <small>v0.3.1 · Linux</small>
+          <small>v0.4.0 · Linux</small>
         </div>
       </aside>
 
@@ -601,7 +626,13 @@ export default function App() {
           <section className="connection panel">
             <div className="connection-label">
               <span className={`dot ${snapshot ? "green" : ""}`} />
-              <strong>{desktop ? "Local engine" : "Demo workspace"}</strong>
+              <strong title={snapshot?.capabilities.target}>
+                {desktop
+                  ? snapshot?.capabilities.location === "remote"
+                    ? "REMOTE ENGINE"
+                    : "Local engine"
+                  : "Demo workspace"}
+              </strong>
               <span className="badge">
                 {desktop
                   ? snapshot
@@ -618,15 +649,72 @@ export default function App() {
                 }}
               >
                 <input
-                  aria-label="Docker socket endpoint"
+                  aria-label={
+                    endpoint.startsWith("context://")
+                      ? "Docker context endpoint"
+                      : "Docker socket endpoint"
+                  }
                   value={endpoint}
                   onChange={(e) => setEndpoint(e.target.value)}
+                  disabled={busy}
+                  title="unix:///absolute/socket or context://NAME (SSH/verified TLS)"
                   spellCheck={false}
                   placeholder="unix:///var/run/docker.sock"
                 />
                 <button disabled={busy} className="primary" type="submit">
                   {snapshot ? "↻ Refresh" : "Connect & scan"}
                 </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  aria-expanded={contexts !== null}
+                  aria-controls="docker-context-picker"
+                  onClick={() => {
+                    if (contexts !== null) setContexts(null);
+                    else
+                      void run<
+                        { name: string; endpoint: string; target: string }[]
+                      >({ type: "contexts" }, setContexts);
+                  }}
+                >
+                  Contexts
+                </button>
+                {contexts !== null && (
+                  <select
+                    id="docker-context-picker"
+                    aria-label="Docker context"
+                    disabled={busy}
+                    value={
+                      contexts.some((c) => c.endpoint === endpoint)
+                        ? endpoint
+                        : ""
+                    }
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setEndpoint(e.target.value);
+                        setContexts(null);
+                        requestAnimationFrame(() =>
+                          document
+                            .querySelector<HTMLInputElement>(
+                              ".connection input",
+                            )
+                            ?.focus(),
+                        );
+                      }
+                    }}
+                  >
+                    <option value="">
+                      {contexts.length
+                        ? "Choose SSH/TLS context…"
+                        : "No supported SSH/TLS contexts"}
+                    </option>
+                    {contexts.map((c) => (
+                      <option key={c.name} value={c.endpoint}>
+                        {c.name} · {c.target}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </form>
             ) : (
               <span className="muted">
@@ -635,6 +723,14 @@ export default function App() {
             )}
             {snapshot && (
               <small title={date(snapshot.capturedAt)}>
+                {snapshot.capabilities.location === "remote" && (
+                  <>
+                    <strong>
+                      {snapshot.endpoint} · {snapshot.capabilities.target}
+                    </strong>
+                    <br />
+                  </>
+                )}
                 Scanned {date(snapshot.capturedAt)}
                 <br />
                 Daemon {snapshot.daemonId} ·{" "}
@@ -1170,7 +1266,7 @@ export default function App() {
                     }
                     response={
                       inspectionData[
-                        `${snapshot?.daemonId}:${inspected.key}:${inspectionTabs[inspected.key]}`
+                        `${snapshot ? connectionIdentity(snapshot) : ""}:${inspected.key}:${inspectionTabs[inspected.key]}`
                       ]
                     }
                     onSave={(alias, project, protectedValue) =>
@@ -1264,10 +1360,21 @@ export default function App() {
         {view === "result" && activeResult && (
           <ResultPage
             result={activeResult}
-            matchingDaemon={snapshot?.daemonId === activeResult.plan.daemonId}
+            matchingDaemon={
+              !!snapshot &&
+              snapshot.daemonId === activeResult.plan.daemonId &&
+              connectionIdentity(snapshot) ===
+                connectionIdentity(activeResult.before)
+            }
             onBack={() => navigate("history")}
             onFollowUp={() => {
-              if (snapshot?.daemonId !== activeResult.plan.daemonId) return;
+              if (
+                !snapshot ||
+                snapshot.daemonId !== activeResult.plan.daemonId ||
+                connectionIdentity(snapshot) !==
+                  connectionIdentity(activeResult.before)
+              )
+                return;
               const followUp = activeResult.plan.newlyEligible.filter((k) =>
                 assets.some(
                   (a) => a.key === k && a.refs.length === 0 && !a.protected,
@@ -1693,6 +1800,16 @@ function Review({
     [cache, setCache] = useState(false);
   return (
     <WorkspacePage title="Review cleanup plan" onBack={onClose}>
+      {plan.endpoint && (
+        <p className={plan.endpoint.startsWith("context://") ? "warning" : ""}>
+          <strong>
+            {plan.endpoint.startsWith("context://")
+              ? "REMOTE CLEANUP"
+              : "Cleanup target"}
+            : {plan.endpoint} · {plan.target}
+          </strong>
+        </p>
+      )}
       <p className="review-provenance">
         Daemon {plan.daemonId} · Snapshot {plan.snapshotId} · Reviewed{" "}
         {date(plan.createdAt)}

@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler
 import json
 import os
 from pathlib import Path
+import shutil
 import socketserver
 import subprocess
 import tempfile
@@ -84,9 +85,13 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    base = Path("/workspace/artifacts")
-    base.mkdir(exist_ok=True)
-    binary = os.environ.get("DOCKER_CLEANUP_NATIVE_BINARY", "/workspace/src-tauri/target/debug/docker-cleanup")
+    root = Path(__file__).resolve().parents[1]
+    base = Path(os.environ.get("DOCKER_CLEANUP_NATIVE_ARTIFACTS", str(root / "artifacts")))
+    base.mkdir(parents=True, exist_ok=True)
+    binary = os.environ.get("DOCKER_CLEANUP_NATIVE_BINARY", str(root / "src-tauri/target/debug/docker-cleanup"))
+    driver_binary = os.environ.get("DOCKER_CLEANUP_TAURI_DRIVER") or shutil.which("tauri-driver")
+    if not driver_binary:
+        raise SystemExit("tauri-driver is required on PATH (CI pins version 2.1.0)")
     with tempfile.TemporaryDirectory(prefix="cleanup-native-") as scratch:
         scratch = Path(scratch)
         engine = FakeEngine(str(scratch / "docker.sock"), Handler)
@@ -94,7 +99,7 @@ def main():
         env = {**os.environ, "XDG_DATA_HOME": str(scratch / "data"),
                "WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS": "1"}
         logfile = (base / "native-driver.log").open("w")
-        driver = subprocess.Popen(["/usr/local/cargo/bin/tauri-driver", "--port", "4444"],
+        driver = subprocess.Popen([driver_binary, "--port", "4444"],
                                   env=env, stdout=logfile, stderr=logfile)
         session = None
         checks = []
@@ -164,7 +169,7 @@ def main():
                 wait("return document.querySelector('[aria-label=\"Protect keep-database\"]')?.disabled===false")
                 js("document.querySelector('[aria-label=\"Protect keep-database\"]').click()")
                 wait("return !!document.querySelector('[aria-label=\"Unprotect keep-database\"]')")
-                if upgrade_version in ("0.2.0", "0.3.0"):
+                if upgrade_version in ("0.2.0", "0.3.0", "0.3.1"):
                     js("const s=document.querySelector('[aria-label=\"Theme\"]');s.value='dark';s.dispatchEvent(new Event('change',{bubbles:true}));")
                     for label, value in [("Inspector width", "360"), ("Treemap height", "190")]:
                         if upgrade_version == "0.2.0":
@@ -200,7 +205,7 @@ def main():
             if upgrade_from:
                 click("Preserved database")
                 check("prior alias project and protection survive upgrade", "return document.querySelector('[aria-label=\"Select Preserved database\"]').disabled && [...document.querySelectorAll('.field')].find(e=>e.textContent.includes('Project / shared / unattributed')).querySelector('input').value==='Upgrade project' && document.querySelector('.inspector h2').textContent==='Preserved database'")
-                if upgrade_version in ("0.2.0", "0.3.0"):
+                if upgrade_version in ("0.2.0", "0.3.0", "0.3.1"):
                     check("prior theme and pane preferences survive upgrade", "return document.documentElement.dataset.theme==='dark' && document.querySelector('[aria-label=\"Theme\"]').value==='dark' && +document.querySelector('[role=\"separator\"][aria-label=\"Inspector width\"]').getAttribute('aria-valuenow')===360 && +document.querySelector('[role=\"separator\"][aria-label=\"Treemap height\"]').getAttribute('aria-valuenow')===190")
                 js("[...document.querySelectorAll('button')].find(b=>b.textContent.includes('Cleanup history')).click()")
                 wait("return !!document.querySelector('.history-list a')")
@@ -244,6 +249,7 @@ def main():
                 check("native pointer category drill-down: " + title, "return document.querySelectorAll('tbody tr').length>0 && document.querySelector('.inspector h2').textContent==='native-old-workspace'")
                 click("All storage")
             js("document.querySelector('[role=\"separator\"][aria-label=\"Treemap height\"]').dispatchEvent(new KeyboardEvent('keydown',{key:'End',bubbles:true}))")
+            wait("return Math.abs(document.querySelector('.treemap').viewBox.baseVal.height-document.querySelector('.treemap').getBoundingClientRect().height)<1")
             shot = http("GET", f"/session/{session}/screenshot")
             (base / "native-explorer.png").write_bytes(base64.b64decode(shot))
             check("native mount boundaries rendered", "return document.body.innerText.includes('External bind mount · retained')")

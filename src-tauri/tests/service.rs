@@ -174,6 +174,69 @@ impl Fixture {
 }
 
 #[test]
+fn same_daemon_different_endpoint_and_failed_switch_invalidate_plans() {
+    let first = Fixture::new();
+    let second = Fixture::new();
+    let mut service = first.service();
+    first.scan(&mut service);
+    let plan = service
+        .dispatch(
+            Request::Plan {
+                keys: vec!["container:old".into()],
+            },
+            |_| {},
+        )
+        .unwrap();
+    second.scan(&mut service);
+    let execute = |id: &Value| Request::Execute {
+        plan_id: id.as_str().unwrap().into(),
+        confirmed: true,
+        confirm_volumes: false,
+        confirm_cache_scope: false,
+    };
+    assert!(service
+        .dispatch(execute(&plan["id"]), |_| {})
+        .unwrap_err()
+        .contains("expired"));
+    let next = service
+        .dispatch(
+            Request::Plan {
+                keys: vec!["container:old".into()],
+            },
+            |_| {},
+        )
+        .unwrap();
+    assert!(service
+        .dispatch(
+            Request::Scan {
+                endpoint: "unix:///missing/docker-cleanup-test.sock".into()
+            },
+            |_| {}
+        )
+        .is_err());
+    assert!(service
+        .dispatch(execute(&next["id"]), |_| {})
+        .unwrap_err()
+        .contains("expired"));
+    assert!(service
+        .dispatch(
+            Request::Plan {
+                keys: vec!["container:old".into()]
+            },
+            |_| {}
+        )
+        .is_err());
+    for f in [&first, &second] {
+        assert!(!f
+            .calls
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|c| c.starts_with("DELETE") || c.starts_with("POST")));
+    }
+}
+
+#[test]
 fn scan_inspect_diff_and_processes_do_not_mutate_daemon() {
     let f = Fixture::new();
     let mut s = f.service();

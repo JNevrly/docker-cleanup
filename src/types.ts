@@ -51,6 +51,8 @@ export interface Action {
   retainedMounts: Mount[];
 }
 export interface Plan {
+  endpoint?: string;
+  target?: string;
   id: string;
   snapshotId: string;
   daemonId: string;
@@ -98,6 +100,7 @@ export interface CleanupResult {
   notes: string[];
 }
 export type Request =
+  | { type: "contexts" }
   | { type: "scan"; endpoint: string }
   | { type: "snapshot" | "history" }
   | { type: "inspect" | "diff" | "processes"; key: string }

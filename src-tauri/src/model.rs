@@ -126,6 +126,10 @@ pub struct Plan {
     pub newly_eligible: Vec<String>,
     pub volumes: bool,
     pub cache_scope: bool,
+    #[serde(default)]
+    pub endpoint: String,
+    #[serde(default)]
+    pub target: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -153,6 +157,7 @@ pub struct CleanupResult {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Request {
+    Contexts,
     Scan {
         endpoint: String,
     },

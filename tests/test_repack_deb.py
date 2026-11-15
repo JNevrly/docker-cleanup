@@ -31,6 +31,10 @@ class RepackTests(unittest.TestCase):
             )
             file = source / "example.txt"
             file.write_text("identical payload\n")
+            copyright_file = source / "usr/share/doc/docker-cleanup/copyright"
+            copyright_file.parent.mkdir(parents=True)
+            copyright_file.write_text("MIT License\n")
+            copyright_file.chmod(0o777)  # Model a non-POSIX workspace's forced mode.
             hashes = []
             for timestamp in [1700000000, 1800000000]:
                 os.utime(file, (timestamp, timestamp))
@@ -41,6 +45,12 @@ class RepackTests(unittest.TestCase):
                                env={**os.environ, "SOURCE_DATE_EPOCH": "1600000000"},
                                check=True, capture_output=True)
                 hashes.append(hashlib.sha256(package.read_bytes()).hexdigest())
+                extracted = root / f"extracted-{timestamp}"
+                subprocess.run(["dpkg-deb", "-x", str(package), str(extracted)],
+                               check=True, capture_output=True)
+                actual = extracted / "usr/share/doc/docker-cleanup/copyright"
+                self.assertEqual(actual.stat().st_mode & 0o777, 0o644)
+                self.assertEqual(actual.read_text(), "MIT License\n")
             self.assertEqual(hashes[0], hashes[1])
 
 

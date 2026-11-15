@@ -11,6 +11,7 @@ pub struct Docker {
     pub version: String,
     pub identity: String,
     pub info: Value,
+    target: Option<crate::contexts::Target>,
 }
 
 pub fn segment(value: &str) -> Result<&str> {
@@ -39,16 +40,23 @@ pub fn encode(value: &str) -> String {
 
 impl Docker {
     pub fn connect(endpoint: &str) -> Result<Self> {
-        let path = endpoint.strip_prefix("unix://")
-            .ok_or("Only local unix:///absolute/path endpoints are supported; remote Docker is out of scope")?;
-        if !path.starts_with('/') || path.contains(['\n', '\r', '\0']) {
-            return Err("Expected an absolute Unix socket path".into());
-        }
+        let target = if endpoint.starts_with("context://") {
+            Some(crate::contexts::Target::resolve(endpoint)?)
+        } else {
+            let path = endpoint.strip_prefix("unix://").ok_or(
+                "Use unix:///absolute/path or an explicit context://NAME (SSH/verified TLS)",
+            )?;
+            if !path.starts_with('/') || path.contains(['\n', '\r', '\0']) {
+                return Err("Expected an absolute Unix socket path".into());
+            }
+            None
+        };
         let mut docker = Self {
             endpoint: endpoint.into(),
             version: String::new(),
             identity: String::new(),
             info: Value::Null,
+            target,
         };
         let version = docker.raw("GET", "/version", None)?;
         if version["Os"] != "linux" {
@@ -79,29 +87,59 @@ impl Docker {
         Ok(docker)
     }
 
+    pub fn remote(&self) -> bool {
+        self.target.is_some()
+    }
+    pub fn target_label(&self) -> &str {
+        self.target
+            .as_ref()
+            .map(|t| t.host.as_str())
+            .unwrap_or(&self.endpoint)
+    }
+    pub fn connection_key(&self) -> String {
+        serde_json::json!([self.endpoint, self.target_label()]).to_string()
+    }
+    pub fn state_scope(&self) -> String {
+        if self.remote() {
+            serde_json::json!(["context", self.connection_key(), self.identity]).to_string()
+        } else {
+            self.identity.clone()
+        }
+    }
+
     pub fn raw(&self, method: &str, path: &str, body: Option<&Value>) -> Result<Value> {
-        if !matches!(method, "GET" | "POST" | "DELETE") || path.contains(['\r', '\n']) {
+        if !matches!(method, "GET" | "POST" | "DELETE")
+            || path.bytes().any(|b| b.is_ascii_control() || b == b' ')
+            || !path.starts_with('/')
+        {
             return Err("Invalid API request".into());
         }
-        let mut stream = UnixStream::connect(self.endpoint.trim_start_matches("unix://"))
-            .map_err(|e| format!("Docker socket: {e}. Check socket path and group membership; do not chmod it world-writable."))?;
-        stream
-            .set_read_timeout(Some(Duration::from_secs(60)))
-            .map_err(|e| e.to_string())?;
-        stream
-            .set_write_timeout(Some(Duration::from_secs(10)))
-            .map_err(|e| e.to_string())?;
         let payload = body.map(|v| v.to_string()).unwrap_or_default();
-        write!(stream, "{method} {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{payload}", payload.len())
-            .map_err(|e| e.to_string())?;
-        let mut response = Vec::new();
-        stream
-            .take(64 * 1024 * 1024 + 1)
-            .read_to_end(&mut response)
-            .map_err(|e| e.to_string())?;
-        if response.len() > 64 * 1024 * 1024 {
-            return Err("Docker response exceeded 64 MiB safety limit".into());
-        }
+        let request = format!("{method} {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{payload}", payload.len());
+        let response = if let Some(target) = &self.target {
+            target.exchange(request.into_bytes())?
+        } else {
+            let mut stream = UnixStream::connect(self.endpoint.trim_start_matches("unix://"))
+            .map_err(|e| format!("Docker socket: {e}. Check socket path and group membership; do not chmod it world-writable."))?;
+            stream
+                .set_read_timeout(Some(Duration::from_secs(60)))
+                .map_err(|e| e.to_string())?;
+            stream
+                .set_write_timeout(Some(Duration::from_secs(10)))
+                .map_err(|e| e.to_string())?;
+            stream
+                .write_all(request.as_bytes())
+                .map_err(|e| e.to_string())?;
+            let mut response = Vec::new();
+            stream
+                .take(64 * 1024 * 1024 + 1)
+                .read_to_end(&mut response)
+                .map_err(|e| e.to_string())?;
+            if response.len() > 64 * 1024 * 1024 {
+                return Err("Docker response exceeded 64 MiB safety limit".into());
+            }
+            response
+        };
         let split = response
             .windows(4)
             .position(|w| w == b"\r\n\r\n")
@@ -128,6 +166,11 @@ impl Docker {
                 404 | 501 => "unsupported-or-missing",
                 _ => "unavailable",
             };
+            if self.remote() {
+                return Err(format!(
+                    "{kind}: remote Docker HTTP {status} (response details withheld)"
+                ));
+            }
             return Err(format!(
                 "{kind}: Docker HTTP {status}: {}",
                 String::from_utf8_lossy(&decoded)

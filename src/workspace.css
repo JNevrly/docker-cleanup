@@ -94,6 +94,16 @@ header p {
   max-width: 370px;
   overflow-wrap: anywhere;
 }
+.connection form {
+  flex: 1 1 430px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.connection select {
+  flex: 1 1 100%;
+  min-width: 0;
+  max-width: 100%;
+}
 .stats {
   margin: 8px 0;
   gap: 0;

@@ -79,10 +79,18 @@ pub fn scan(docker: &Docker, store: &Store, cancelled: impl Fn() -> bool) -> Res
     ];
     let mut capabilities = BTreeMap::new();
     capabilities.insert("api".into(), docker.version.clone());
+    capabilities.insert("connection".into(), docker.connection_key());
+    capabilities.insert("target".into(), docker.target_label().into());
+    capabilities.insert(
+        "location".into(),
+        if docker.remote() { "remote" } else { "local" }.into(),
+    );
+    if docker.remote() {
+        warnings.push("Remote Engine: all workspace and mount paths are daemon-side metadata, not local filesystem evidence. Local host process correlation is disabled.".into());
+    }
     capabilities.insert(
         "builder".into(),
-        "Engine-managed cache only. External buildx builders are unsupported; no CLI dependency."
-            .into(),
+        "Engine-managed cache only. External buildx builders are unsupported.".into(),
     );
     let df = match docker.get("/system/df") {
         Ok(v) => {
@@ -308,15 +316,21 @@ pub fn scan(docker: &Docker, store: &Store, cancelled: impl Fn() -> bool) -> Res
                     .push("Inferred from referencing containers".into());
             }
         }
-        store.apply(&docker.identity, a)?;
+        store.apply(&docker.state_scope(), a)?;
+        if docker.remote() {
+            a.evidence.push(
+                "Remote daemon-side project/mount evidence; no local path or process correlation"
+                    .into(),
+            );
+        }
         if a.last_used.is_none() {
-            if let Some((at, source)) = store.last_observed(&docker.identity, &a.key) {
+            if let Some((at, source)) = store.last_observed(&docker.state_scope(), &a.key) {
                 a.last_used = Some(at);
                 a.last_used_source = source;
             }
         }
     }
-    if let Some(previous) = store.last_snapshot(&docker.identity) {
+    if let Some(previous) = store.last_snapshot(&docker.state_scope()) {
         // Bounded event read, never an indefinite event stream.
         let since = chrono::DateTime::parse_from_rfc3339(&previous.captured_at)
             .map(|t| t.timestamp())
@@ -364,7 +378,7 @@ pub fn scan(docker: &Docker, store: &Store, cancelled: impl Fn() -> bool) -> Res
         warnings,
         capabilities,
     };
-    store.snapshot(&snapshot)?;
+    store.snapshot_scoped(&docker.state_scope(), &snapshot)?;
     Ok(snapshot)
 }
 

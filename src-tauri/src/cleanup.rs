@@ -140,6 +140,12 @@ pub fn build_plan(snapshot: &Snapshot, keys: &[String], cache_scope: bool) -> Re
         .map(|a| a.key.clone())
         .collect();
     Ok(Plan {
+        endpoint: snapshot.endpoint.clone(),
+        target: snapshot
+            .capabilities
+            .get("target")
+            .cloned()
+            .unwrap_or_else(|| snapshot.endpoint.clone()),
         id: Uuid::new_v4().to_string(),
         snapshot_id: snapshot.id.clone(),
         daemon_id: snapshot.daemon_id.clone(),

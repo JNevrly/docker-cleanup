@@ -79,7 +79,7 @@ async function stub(
           transformCallback: () => 1,
           invoke: async (
             command: string,
-            args: { request?: { type: string } },
+            args: { request?: { type: string; endpoint?: string } },
           ) => {
             if (command !== "dispatch") return 1;
             const test = (
@@ -88,7 +88,11 @@ async function stub(
               }
             ).historyTest;
             if (args.request?.type === "scan")
-              return { ...snapshot, daemonId: test.daemon };
+              return {
+                ...snapshot,
+                daemonId: test.daemon,
+                endpoint: args.request.endpoint ?? snapshot.endpoint,
+              };
             if (args.request?.type === "history") return records;
             if (args.request?.type === "execute") {
               test.executes++;
@@ -196,6 +200,16 @@ test("historical follow-up is blocked for another daemon and selects only eligib
       window as unknown as { historyTest: { daemon: string } }
     ).historyTest.daemon = "legacy-daemon";
   });
+  await page.getByRole("button", { name: "↻ Refresh", exact: true }).click();
+  await page.getByRole("button", { name: /Cleanup history/ }).click();
+  await page
+    .getByRole("link", { name: "Open cleanup result legacy-0", exact: true })
+    .click();
+  await expect(followUp).toBeDisabled(); // Same daemon through another endpoint is not enough.
+  await page.getByRole("button", { name: /Storage explorer/ }).click();
+  await page
+    .getByLabel("Docker socket endpoint", { exact: true })
+    .fill("unix:///synthetic/legacy.sock");
   await page.getByRole("button", { name: "↻ Refresh", exact: true }).click();
   await page.getByRole("button", { name: /Cleanup history/ }).click();
   await page

@@ -208,6 +208,9 @@ export function ResultPage({
         <h2>{date(result.at)}</h2>
         <p>
           Daemon {result.plan.daemonId} · {result.before.endpoint}
+          {result.before.capabilities.location === "remote" && (
+            <> · REMOTE: {result.before.capabilities.target}</>
+          )}
         </p>
         <p className="warning">
           Deletion is irreversible. Partial success is not rolled back, and this
@@ -264,8 +267,9 @@ export function ResultPage({
             </button>
             {!matchingDaemon && (
               <p className="warning">
-                Connect to this result’s daemon before selecting follow-up
-                assets. Historical results cannot authorize another cleanup.
+                Connect to this result’s daemon and endpoint before selecting
+                follow-up assets. Historical results cannot authorize another
+                cleanup.
               </p>
             )}
           </>

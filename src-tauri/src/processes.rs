@@ -33,7 +33,9 @@ pub fn collect(docker: &Docker, asset: &Asset) -> Result<Value> {
         Value::Null
     };
     let mut host = vec![];
-    if std::env::var("HARNESS_SANDBOX").as_deref() == Ok("1") {
+    if docker.remote() {
+        notes.push("Remote Engine: host process correlation is disabled. Workspace and mount paths belong to the daemon host, not this computer.".into());
+    } else if std::env::var("HARNESS_SANDBOX").as_deref() == Ok("1") {
         notes.push("Host correlation unavailable inside this development sandbox: /proc describes the sandbox, not the Docker host.".into());
     } else {
         // Map local TCP clients whose remote port matches a container's published

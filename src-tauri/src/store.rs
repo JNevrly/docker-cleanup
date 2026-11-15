@@ -85,11 +85,14 @@ impl Store {
         Ok(())
     }
     pub fn snapshot(&self, snapshot: &Snapshot) -> Result<()> {
+        self.snapshot_scoped(&snapshot.daemon_id, snapshot)
+    }
+    pub fn snapshot_scoped(&self, scope: &str, snapshot: &Snapshot) -> Result<()> {
         let data = serde_json::to_string(snapshot).map_err(|e| e.to_string())?;
         self.db
             .execute(
                 "INSERT INTO snapshots VALUES (?1,?2,?3,?4)",
-                params![snapshot.id, snapshot.daemon_id, snapshot.captured_at, data],
+                params![snapshot.id, scope, snapshot.captured_at, data],
             )
             .map_err(|e| e.to_string())?;
         for a in &snapshot.assets {
@@ -109,7 +112,7 @@ impl Store {
                  ON CONFLICT(daemon,key) DO UPDATE SET last_seen=excluded.last_seen,
                  last_active=COALESCE(excluded.last_active,observations.last_active),
                  last_source=COALESCE(excluded.last_source,observations.last_source)",
-                params![snapshot.daemon_id,a.key,snapshot.captured_at,active,source]).map_err(|e| e.to_string())?;
+                params![scope,a.key,snapshot.captured_at,active,source]).map_err(|e| e.to_string())?;
         }
         // Keep history bounded; cleanup results are retained separately.
         self.db.execute("DELETE FROM snapshots WHERE id NOT IN (SELECT id FROM snapshots ORDER BY at DESC LIMIT 200)", []).map_err(|e| e.to_string())?;

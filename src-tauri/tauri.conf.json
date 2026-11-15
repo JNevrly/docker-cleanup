@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Docker Cleanup",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "identifier": "io.github.docker-cleanup.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -26,10 +26,19 @@
     }
   },
   "bundle": {
+    "publisher": "Josef (JNevrly)",
+    "homepage": "https://github.com/JNevrly/docker-cleanup",
+    "license": "MIT",
+    "licenseFile": "../LICENSE",
     "active": true,
     "targets": ["deb"],
     "category": "Utility",
-    "shortDescription": "Inspect and safely clean local Docker storage",
-    "linux": { "deb": { "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0"] } }
+    "shortDescription": "Inspect and safely clean Docker storage",
+    "linux": {
+      "deb": {
+        "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0"],
+        "files": { "/usr/share/doc/docker-cleanup/copyright": "../LICENSE" }
+      }
+    }
   }
 }
