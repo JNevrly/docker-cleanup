@@ -135,6 +135,9 @@ test("explicit remote discovery, review identity and failed/same-daemon switch i
   await expect(
     page.getByText(/Docker connection changed. Selection/),
   ).toBeVisible();
+  await expect
+    .poll(() => page.locator(".table-scroll").evaluate((el) => el.clientHeight))
+    .toBeGreaterThanOrEqual(100);
   await page
     .getByRole("checkbox", { name: `Select ${asset.name}`, exact: true })
     .check();

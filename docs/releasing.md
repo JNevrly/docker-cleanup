@@ -164,3 +164,36 @@ import traceback; `--help` still works.
 **Not yet verified:** GitHub runner setup, repository permissions, tag-triggered
 draft creation and actual release upload. These need the first hosted run.
 No commit, push, version tag or release publication was performed during preparation.
+
+## Browser layout diagnostics
+
+Browser journeys use the lockfile's Chromium with desktop scrollbars visible.
+When comparing a sandbox run to CI, unset `CHROMIUM_PATH` so a preinstalled
+browser does not replace that revision:
+
+```bash
+npx --no-install playwright install chromium
+env -u CHROMIUM_PATH CI=1 npm run test:e2e -- --workers=2
+```
+
+Use `PLAYWRIGHT_BROWSERS_PATH` for both commands if the default browser cache is
+not writable. Failed journeys retain screenshots and traces in `test-results/`;
+GitHub uploads these with `playwright-report/` as `browser-diagnostics`.
+
+The constrained-table regressions exercise 21px horizontal scrollbars and two
+font families. Table budgeting reserves at least 100px of **client** height plus
+measured scrollbar/border overhead; when wrapped controls cannot fit, the explorer
+pane scrolls instead of clipping the table. The original 104px outer reservation
+left only 83px with a 21px scrollbar, allowing the sticky header to intercept row
+checkboxes. Pointer checks and the 100px minimum remain enforced.
+
+After a fix, commit and push the reviewed changes to start a workflow on that
+commit. Rerunning an older failed workflow still tests its original source.
+
+The layout follow-up passed 59 browser journeys with the locked Chromium
+159.0.8154.6 (Playwright revision 1255), 17 frontend unit tests, 18 Python tests,
+36 Rust unit/service tests,
+the production build, formatting, release guards and workflow lint. The rebuilt
+native WebKit executable passed 24 smoke checks; its local evidence is in
+`artifacts/ci-layout-native/`. This is local verification, not a hosted-CI result,
+and the earlier local release candidate predates this layout fix.

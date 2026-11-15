@@ -4,10 +4,14 @@ export default defineConfig({
   use: {
     baseURL: "http://127.0.0.1:1420",
     headless: true,
+    screenshot: "only-on-failure",
+    trace: "retain-on-failure",
     viewport: { width: 1440, height: 1050 },
     launchOptions: {
       executablePath: process.env.CHROMIUM_PATH || undefined,
       args: ["--no-sandbox"],
+      // Desktop scrollbars consume layout space; headless defaults can mask it.
+      ignoreDefaultArgs: ["--hide-scrollbars"],
     },
   },
   webServer: {

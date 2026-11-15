@@ -1046,7 +1046,13 @@ export default function App() {
                         " · No individually eligible assets here; protected, active and accounting-only assets are excluded. Cache uses Clear Engine build cache, not row selection."}
                     </small>
                   </div>
-                  <div className="table-scroll">
+                  <div
+                    className="table-scroll"
+                    style={{
+                      minHeight: mapSpace.tableMinimum,
+                      scrollPaddingTop: mapSpace.tableHeaderHeight,
+                    }}
+                  >
                     {explainedCategory === "cache" && (
                       <section
                         className="cache-workflow"

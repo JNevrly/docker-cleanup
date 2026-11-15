@@ -677,7 +677,9 @@ main {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden;
+  /* If wrapped controls plus a minimum map cannot fit, scroll this pane
+     instead of clipping the asset viewport or the controls beneath it. */
+  overflow: auto;
 }
 .explorer > :not(.table-scroll) {
   flex-shrink: 0;
@@ -690,6 +692,7 @@ main {
   max-height: none;
   overflow: auto;
   overscroll-behavior: contain;
+  scroll-padding-bottom: 4px;
 }
 .inspector {
   position: static;
