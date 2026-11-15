@@ -248,6 +248,20 @@ def main():
                 wait("return document.querySelector('[aria-label=\"Storage location\"]').textContent.includes(" + json.dumps(title) + ")")
                 check("native pointer category drill-down: " + title, "return document.querySelectorAll('tbody tr').length>0 && document.querySelector('.inspector h2').textContent==='native-old-workspace'")
                 click("All storage")
+            volume_name = "Preserved database" if upgrade_from else "keep-database"
+            volume_selector = f'[aria-label^="Inspect {volume_name},"]'
+            js("window.compactVolumeSelector=arguments[0]", volume_selector)
+            wait("const e=document.querySelector(window.compactVolumeSelector);return e && e.getBoundingClientRect().height>8")
+            check("native compact leaf center is not intercepted by its category header",
+                  "const e=document.querySelector(window.compactVolumeSelector),r=e.getBoundingClientRect(),h=document.querySelector('.map-group-target[data-group=\"volume\"] .map-group-hit').getBoundingClientRect();return r.y>=h.bottom && e.contains(document.elementFromPoint(Math.floor(r.x+r.width/2),Math.floor(r.y+r.height/2))) && document.querySelector('.table-scroll').clientHeight>=100")
+            pointer_at(volume_selector, click_button=True)
+            wait("return document.querySelector('.inspector h2').textContent===" + json.dumps(volume_name))
+            check("native compact pointer leaf inspects without category drill-down",
+                  "return !document.querySelector('[aria-label=\"Storage location\"]').textContent.includes('Volumes')")
+            shot = http("GET", f"/session/{session}/screenshot")
+            (base / "native-compact.png").write_bytes(base64.b64decode(shot))
+            click("native-old-workspace")
+            wait("return document.querySelector('.inspector h2').textContent==='native-old-workspace'")
             js("document.querySelector('[role=\"separator\"][aria-label=\"Treemap height\"]').dispatchEvent(new KeyboardEvent('keydown',{key:'End',bubbles:true}))")
             wait("return Math.abs(document.querySelector('.treemap').viewBox.baseVal.height-document.querySelector('.treemap').getBoundingClientRect().height)<1")
             shot = http("GET", f"/session/{session}/screenshot")

@@ -1,15 +1,10 @@
-import { hierarchy, treemap } from "d3-hierarchy";
 import { colors, bytes, storageBytes, titles } from "./domain";
 import type { Asset } from "./types";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { fitLabel } from "./mapLabels";
+import { groupHeaderHeight, storageLayout } from "./treemapGeometry";
 
-interface Node {
-  name: string;
-  asset?: Asset;
-  children?: Node[];
-}
 export default function Treemap({
   assets,
   groupBy,
@@ -87,29 +82,7 @@ export default function Treemap({
     observer.observe(svg);
     return () => observer.disconnect();
   }, []);
-  const groups = new Map<string, Asset[]>();
-  for (const a of assets) {
-    if ((storageBytes(a) ?? 0) <= 0) continue;
-    const group = groupBy === "kind" ? a.kind : a.project;
-    groups.set(group, [...(groups.get(group) ?? []), a]);
-  }
-  const root = hierarchy<Node>({
-    name: "Storage",
-    children: [...groups].map(([name, items]) => ({
-      name,
-      children: items.map((asset) => ({
-        name: asset.alias || asset.name,
-        asset,
-      })),
-    })),
-  })
-    .sum((n) => (n.asset ? (storageBytes(n.asset) ?? 0) : 0))
-    .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
-  const layout = treemap<Node>()
-    .size([size[0], size[1]])
-    .paddingOuter(4)
-    .paddingInner(4)
-    .paddingTop((n) => (n.depth === 1 ? 27 : 4))(root);
+  const layout = storageLayout(assets, groupBy, size[0], size[1]);
   return (
     <>
       <svg
@@ -135,7 +108,9 @@ export default function Treemap({
         })}
         {layout
           .leaves()
-          .filter((n) => n.data.asset)
+          // Collapsed tiles have no pointer target; keep their assets available
+          // in the table instead of exposing invisible SVG buttons.
+          .filter((n) => n.data.asset && n.x1 > n.x0 && n.y1 > n.y0)
           .map((node, index) => {
             const a = node.data.asset!;
             const width = Math.max(0, node.x1 - node.x0),
@@ -255,12 +230,12 @@ export default function Treemap({
               </g>
             );
           })}
-        {/* Headers are painted last so shallow leaves cannot cover their hit areas. */}
+        {/* Headers share D3's adaptive padding, keeping leaf hit areas separate. */}
         {layout.children?.map((group, index) => {
           const full =
             groupBy === "kind" ? titles[group.data.name] : group.data.name;
           const width = Math.max(0, group.x1 - group.x0),
-            height = Math.max(0, Math.min(27, group.y1 - group.y0));
+            height = groupHeaderHeight(group.y1 - group.y0);
           const label =
             fitLabel(
               full,

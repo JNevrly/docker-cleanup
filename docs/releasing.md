@@ -197,3 +197,28 @@ the production build, formatting, release guards and workflow lint. The rebuilt
 native WebKit executable passed 24 smoke checks; its local evidence is in
 `artifacts/ci-layout-native/`. This is local verification, not a hosted-CI result,
 and the earlier local release candidate predates this layout fix.
+
+The compact-treemap follow-up addresses a separate pointer boundary exposed by
+the smaller map budget: a fixed 27px category header left a 1px asset body in a
+40px map. Header padding and hit rectangles now share an adaptive height (40% of
+the group height, capped at 27px), leaving space for leaf targets. Zero-area
+leaves do not expose invisible SVG buttons; their assets remain in the table.
+Category headers still support pointer/keyboard navigation and tooltip labels.
+
+`tests/browser/treemap-targets.spec.ts` fixes the actual SVG height to
+40/50/60/80/120px with two fonts, checks that the leaf owns its center hit target,
+and uses ordinary header/leaf clicks while preserving selection, inspector
+drafts and the 100px table minimum. This avoids relying on the runner's font
+metrics to reproduce the compact case. The native harness also exercises a real
+pointer click on a 40px-map volume leaf.
+
+Local verification of this follow-up passed **61 browser journeys** with the
+locked Chromium and two workers, **20 frontend unit tests**, **18 Python tests**,
+the production build and formatting, plus **26 native WebKit checks**.
+Before-fix compact regressions failed with both fonts. Reports are under
+`artifacts/treemap-targets-before-report/`,
+`artifacts/treemap-targets-full-serial-resources-report/` and
+`artifacts/treemap-targets-native/` (intentionally ignored).
+An earlier full run with concurrent native work hit the separate 1,000-item
+inventory's unchanged 5s loading assertion; the clean full run passed without
+changing workers, timeouts or retries. Hosted CI still needs to verify this fix.
