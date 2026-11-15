@@ -1,0 +1,40 @@
+[package]
+name = "docker-cleanup"
+version = "0.3.1"
+edition = "2021"
+description = "An evidence-led, safety-first local Docker storage explorer"
+license = "MIT"
+authors = ["Docker Cleanup contributors"]
+default-run = "docker-cleanup"
+
+[lib]
+name = "docker_cleanup"
+path = "src/lib.rs"
+
+[[bin]]
+name = "docker-cleanup"
+path = "src/main.rs"
+required-features = ["desktop"]
+
+[[bin]]
+name = "cleanup-rpc"
+path = "src/rpc.rs"
+
+[features]
+default = []
+desktop = ["dep:tauri", "dep:tauri-build"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+rusqlite = { version = "0.38", features = ["bundled"] }
+tauri = { version = "2", optional = true }
+
+[build-dependencies]
+tauri-build = { version = "2", optional = true }
+
+[dev-dependencies]
+tempfile = "3"

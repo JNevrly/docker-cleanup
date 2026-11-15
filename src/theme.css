@@ -1,0 +1,317 @@
+/* Semantic colors and readable type; layout changes belong to the workspace task. */
+:root {
+  font-size: 16px;
+  color: var(--text, #20242d);
+  background: var(--page, #f5f6f8);
+}
+body {
+  color: var(--text);
+  background: var(--page);
+}
+button,
+input,
+select,
+textarea {
+  font-size: 14px;
+}
+button {
+  transition: none;
+  background: var(--inset);
+  color: var(--text);
+  border-color: var(--border);
+}
+button:hover:not(:disabled) {
+  background: var(--hover);
+}
+button:disabled {
+  opacity: 1;
+  color: var(--muted);
+  border-style: solid;
+}
+input,
+select,
+textarea {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--border);
+}
+input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+input[type="checkbox"] {
+  accent-color: var(--primary);
+  width: 18px;
+  height: 18px;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+small,
+code,
+.nav-label,
+.eyebrow,
+.badge,
+.stat > span,
+.section-head p,
+.map-hint,
+.legend,
+.map-note,
+.project-name,
+td > small,
+.table-header h2 span,
+.selection-bar small,
+.selection-total small,
+.asset-id,
+.inspector-size small,
+.inspector dd small,
+.mount strong,
+.mount code,
+.result-stats {
+  font-size: 12px;
+  letter-spacing: normal;
+}
+h3,
+.nav-item,
+.breadcrumbs,
+.breadcrumbs button,
+.table-header input,
+.filters select,
+.filters > input,
+.filters label,
+.list-actions button,
+th,
+td,
+.asset-name,
+.state,
+.scan-notes,
+.inspector-section,
+.evidence,
+.field,
+.inspector button,
+.inspector dl,
+.operation button,
+.modal p,
+.modal pre,
+.action-list,
+.confirmation,
+.segmented button {
+  font-size: 14px;
+}
+p,
+small,
+.muted,
+.brand div span,
+.nav-label,
+.sidebar-bottom,
+.sidebar-bottom p,
+.eyebrow,
+.stat > span,
+.breadcrumbs,
+.map-hint,
+.legend,
+.map-note,
+.table-header h2 span,
+.filters label,
+th,
+.state,
+.scan-notes,
+.asset-id,
+.inspector-size small,
+.field,
+.inspector dt,
+.mount code,
+.empty,
+.welcome,
+.result-stats {
+  color: var(--muted);
+}
+.asset-name,
+.inspector dd {
+  color: var(--text);
+}
+.sidebar,
+.panel,
+.stat,
+.inspector,
+.modal {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--border);
+}
+.brand-icon,
+.welcome-icon,
+.mint,
+.state.running,
+.inspector-size,
+.selection-total strong,
+.review-total strong,
+.result-stats strong,
+.mount strong,
+td:last-child button {
+  color: var(--accent);
+}
+.sand {
+  color: var(--sand);
+}
+.nav-item.active,
+.nav-item.chosen {
+  background: var(--selected);
+  color: var(--text);
+  border-color: var(--accent);
+}
+.nav-item.active {
+  border-left: 4px solid var(--accent);
+  font-weight: 650;
+}
+.dot.green {
+  background: var(--accent);
+  box-shadow: none;
+}
+.badge,
+.selection-count {
+  color: var(--badge-text);
+  background: var(--badge);
+  border-color: var(--border);
+}
+.primary,
+.primary:disabled {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
+}
+.primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+.segmented,
+thead,
+.table-header h2 span,
+.mount,
+.modal pre {
+  background: var(--inset);
+  border-color: var(--border);
+}
+.segmented button[aria-pressed="true"] {
+  color: var(--text);
+  background: var(--selected);
+  box-shadow: inset 0 -3px var(--accent);
+}
+.table-header,
+td,
+.inspector-section,
+.result,
+.modal-actions {
+  border-color: var(--border);
+}
+tr:hover {
+  background: var(--hover);
+}
+tr.focused {
+  background: var(--selected);
+  box-shadow: inset 4px 0 var(--accent);
+}
+.selection-bar {
+  background: var(--surface);
+  border-color: var(--border);
+  backdrop-filter: none;
+}
+.operation,
+.review-total {
+  color: var(--text);
+  background: var(--selected);
+  border-color: var(--border);
+}
+.alert,
+.badge.bad {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-color: var(--danger);
+}
+.warning {
+  color: var(--warning-text) !important;
+  background: var(--warning);
+  font-size: 14px !important;
+  border-color: var(--warning-text);
+}
+.danger {
+  color: var(--danger) !important;
+}
+.destructive,
+.destructive:disabled {
+  color: var(--on-primary);
+  background: var(--danger-button);
+  border-color: var(--danger-button);
+}
+.destructive:hover:not(:disabled) {
+  background: var(--danger-hover);
+}
+button:disabled,
+.primary:disabled,
+.destructive:disabled {
+  background: var(--inset);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.modal pre {
+  color: var(--text);
+}
+.modal-backdrop {
+  background: var(--backdrop);
+}
+.spinner {
+  width: 18px;
+  height: 18px;
+  border-color: var(--border);
+  border-top-color: var(--accent);
+}
+.filters > input {
+  width: 130px;
+}
+.theme-control {
+  display: grid;
+  gap: 5px;
+  margin-top: 20px;
+  color: var(--text);
+  font-size: 14px;
+}
+.list-actions small {
+  font-size: 12px;
+}
+.sidebar-bottom {
+  font-size: 14px;
+}
+.treemap [role="button"]:focus-visible > rect:first-of-type {
+  stroke: var(--focus);
+  stroke-width: 4px;
+}
+.brand {
+  letter-spacing: -0.4px;
+}
+.brand-icon {
+  color: var(--accent);
+}
+.stat > strong,
+.inspector-size,
+.result-stats strong,
+.selection-total strong {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+.selection-bar {
+  box-shadow: 0 -2px 10px #00000008;
+}
+.nav-item {
+  border-radius: 5px;
+}
+.nav-item.chosen {
+  border-left: 4px solid var(--accent);
+  font-weight: 650;
+}
